@@ -1,0 +1,42 @@
+make_blacklist.sh generates country netblocks in CIDR notation for use by pf
+and nftables from data obtained directly from each Regional Internet Registry
+(RIR).
+
+The arguments are one or more ISO 3166 2-letter country codes. Files for pf
+and nftables are produced containing netblocks allocated to or used by
+organisations in those countries.
+
+	make_blacklist.sh c1 c2 c3 ... cn
+
+For country codes, refer to:
+
+	https://www.iso.org/obp/ui/#search
+
+Known malicious networks, crawlers or other netblocks can be added to the
+malnets.txt file so that those ranges are also included in the output files.
+
+Netblock allocations change frequently and it may be useful to periodically
+rerun the script to ensure accuracy. Note that approximately 22G of memory is
+required by the process.
+
+To use the results in pf, add the following line to pf.conf
+
+	table <blacklist> persist counters file "/etc/pf.blacklist"
+
+Similarly for nftables, add the below to nftables.conf
+
+	include "/etc/nftables.blacklist_ipv4"
+	include "/etc/nftables.blacklist_ipv6"
+
+	table inet filter {
+		set blacklist_ipv4 {
+			type ipv4_addr; flags interval; counter;
+			elements = $blacklist_ipv4
+		}
+		set blacklist_ipv6 {
+			type ipv6_addr; flags interval; counter;
+			elements = $blacklist_ipv6
+		}
+	...
+	}
+
