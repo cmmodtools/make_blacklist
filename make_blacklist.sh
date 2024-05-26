@@ -42,6 +42,7 @@ curl --fail-early --show-error --silent \
 cat malnets.txt
 ) | ./summarize.py > pf.blacklist
 
-grep \\. pf.blacklist | (echo define blacklist_ipv4 = {; while read net; do printf \\t$net,\\n; done; echo "}") > nftables.blacklist_ipv4
-grep : pf.blacklist | (echo define blacklist_ipv6 = {; while read net; do printf \\t$net,\\n; done; echo "}") > nftables.blacklist_ipv6
+grep \\. pf.blacklist | (echo define blacklist_ipv4 = {; while read net; do printf "\t%s,\n" "$net"; done; echo "}") > nftables.blacklist_ipv4
+grep : pf.blacklist | (echo define blacklist_ipv6 = {; while read net; do printf "\t%s,\n" "$net"; done; echo "}") > nftables.blacklist_ipv6
 
+(set -- $CC; printf "{\n    \"name\": \"Blacklist\",\n    \"description\": \"Country blocks for %s\",\n    \"denied-remote-domains\": [\"%s\"" "$(echo $CC | tr [:lower:] [:upper:])" "$1"; shift; for c in $@; do printf ", \"%s\"" "$c"; done; read net; printf "],\n    \"denied-remote-addresses\": [\"%s\"" "$net"; while read net; do printf ", \"%s\"" "$net"; done; printf "]\n}") < pf.blacklist > blacklist.lsrules
