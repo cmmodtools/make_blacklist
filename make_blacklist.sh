@@ -17,18 +17,20 @@
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 CC="
-	$@
+	
 "
 
+set -- $(echo $CC $@ | tr "[:upper:][:space:]" "[:lower:]\n" | sort -u)
+
 (
-curl --fail-early --show-error --silent \
+curl --retry 5 --fail-early --show-error --silent \
 	https://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest \
 	https://ftp.ripe.net/ripe/stats/delegated-ripencc-latest \
 	https://ftp.afrinic.net/pub/stats/afrinic/delegated-afrinic-latest \
 	https://ftp.arin.net/pub/stats/arin/delegated-arin-extended-latest \
 	https://ftp.lacnic.net/pub/stats/lacnic/delegated-lacnic-latest \
-| ./nets_from_stats.py $CC &
-curl --fail-early --show-error --silent \
+| ./nets_from_stats.py $@ &
+curl --retry 5 --fail-early --show-error --silent \
 	https://ftp.apnic.net/apnic/whois/apnic.db.inetnum.gz \
 	https://ftp.apnic.net/apnic/whois/apnic.db.inet6num.gz \
 	https://ftp.apnic.net/apnic/whois/apnic.db.organisation.gz \
@@ -38,11 +40,11 @@ curl --fail-early --show-error --silent \
 	https://ftp.afrinic.net/pub/dbase/afrinic.db.gz \
 	https://ftp.lacnic.net/lacnic/dbase/lacnic.db.gz \
 	https://ftp.arin.net/pub/rr/arin.db.gz \
-| gzcat | ./nets_from_whois.py $CC &
+| gzcat | ./nets_from_whois.py $@ &
 cat malnets.txt
 ) | ./summarize.py > pf.blacklist
 
 grep \\. pf.blacklist | (echo define blacklist_ipv4 = {; while read net; do printf "\t%s,\n" "$net"; done; echo "}") > nftables.blacklist_ipv4
 grep : pf.blacklist | (echo define blacklist_ipv6 = {; while read net; do printf "\t%s,\n" "$net"; done; echo "}") > nftables.blacklist_ipv6
 
-(set -- $CC; printf "{\n    \"name\": \"Blacklist\",\n    \"description\": \"Country blocks for %s\",\n    \"denied-remote-domains\": [\"%s\"" "$(echo $CC | tr [:lower:] [:upper:])" "$1"; shift; for c in $@; do printf ", \"%s\"" "$c"; done; read net; printf "],\n    \"denied-remote-addresses\": [\"%s\"" "$net"; while read net; do printf ", \"%s\"" "$net"; done; printf "]\n}") < pf.blacklist > blacklist.lsrules
+(printf "{\n    \"name\": \"Blacklist\",\n    \"description\": \"Country blocks for %s\",\n    \"denied-remote-domains\": [\"%s\"" "$(echo $@ | tr [:lower:] [:upper:])" "$1"; shift; for cc in $@; do printf ", \"%s\"" "$cc"; done; read net; printf "],\n    \"denied-remote-addresses\": [\"%s\"" "$net"; while read net; do printf ", \"%s\"" "$net"; done; printf "]\n}") < pf.blacklist > blacklist.lsrules
